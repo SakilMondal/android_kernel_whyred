@@ -179,6 +179,9 @@ struct mon_rx_status {
 	uint8_t  sgi;
 	uint8_t  ldpc;
 	uint8_t  beamformed;
+	uint8_t  tx_status;
+	bool add_rtap_ext;
+	uint8_t  tx_retry_cnt;
 };
 
 /* DHCP Related Mask */
