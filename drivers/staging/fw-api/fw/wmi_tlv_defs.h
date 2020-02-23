@@ -984,6 +984,34 @@ typedef enum {
     WMITLV_TAG_STRUC_wmi_pdev_dsm_filter_fixed_param,
     WMITLV_TAG_STRUC_wmi_pdev_bssid_disallow_list_config_param,
     WMITLV_TAG_STRUC_wmi_mgmt_hdr,
+    WMITLV_TAG_STRUC_wmi_muedca_params_config_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_twt_btwt_invite_sta_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_twt_btwt_remove_sta_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_twt_btwt_invite_sta_complete_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_twt_btwt_remove_sta_complete_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_vdev_delete_all_peer_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_vdev_delete_all_peer_resp_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_chan_rf_characterization_info_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_oem_data_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_roam_enable_disable_trigger_reason_fixed_param,
+    WMITLV_TAG_STRUC_wmi_service_ready_ext2_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_roam_preauth_status_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_roam_preauth_start_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_set_elna_bypass_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_get_elna_bypass_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_get_elna_bypass_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_roam_pmkid_request_event_fixed_param,
+    WMITLV_TAG_STRUC_wmi_peer_cfr_capture_event_phase_fixed_param,
+    WMITLV_TAG_STRUC_wmi_audio_aggr_enable_cmd_fixed_param,
+    WMITLV_TAG_STRUC_audio_aggr_rate_set,
+    WMITLV_TAG_STRUC_wmi_audio_aggr_add_group,
+    WMITLV_TAG_STRUC_wmi_audio_aggr_del_group,
+    WMITLV_TAG_STRUC_wmi_audio_aggr_set_group_rate,
+    WMITLV_TAG_STRUC_wmi_audio_aggr_set_group_retry,
+    WMITLV_TAG_STRUC_wmi_cfr_capture_filter_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_cfr_filter_group_config,
+    WMITLV_TAG_STRUC_wmi_fd_tmpl_cmd_fixed_param,
+    WMITLV_TAG_STRUC_wmi_vdev_bss_max_idle_time_cmd_fixed_param,
 } WMITLV_TAG_ID;
 
 /*
@@ -1383,6 +1411,22 @@ typedef enum {
     OP(WMI_ROAM_IDLE_CONFIG_CMDID) \
     OP(WMI_IDLE_TRIGGER_MONITOR_CMDID) \
     OP(WMI_PDEV_DSM_FILTER_CMDID) \
+    OP(WMI_TWT_BTWT_INVITE_STA_CMDID) \
+    OP(WMI_TWT_BTWT_REMOVE_STA_CMDID) \
+    OP(WMI_VDEV_DELETE_ALL_PEER_CMDID) \
+    OP(WMI_OEM_DATA_CMDID) \
+    OP(WMI_ROAM_ENABLE_DISABLE_TRIGGER_REASON_CMDID) \
+    OP(WMI_ROAM_PREAUTH_STATUS_CMDID) \
+    OP(WMI_SET_ELNA_BYPASS_CMDID) \
+    OP(WMI_GET_ELNA_BYPASS_CMDID) \
+    OP(WMI_AUDIO_AGGR_ENABLE_CMDID) \
+    OP(WMI_AUDIO_AGGR_ADD_GROUP_CMDID) \
+    OP(WMI_AUDIO_AGGR_DEL_GROUP_CMDID) \
+    OP(WMI_AUDIO_AGGR_SET_GROUP_RATE_CMDID) \
+    OP(WMI_AUDIO_AGGR_SET_GROUP_RETRY_CMDID) \
+    OP(WMI_CFR_CAPTURE_FILTER_CMDID) \
+    OP(WMI_FD_TMPL_CMDID) \
+    OP(WMI_VDEV_BSS_MAX_IDLE_TIME_CMDID) \
     /* add new CMD_LIST elements above this line */
 
 
@@ -2039,6 +2083,13 @@ WMITLV_CREATE_PARAM_STRUC(WMI_PRB_TMPL_CMDID);
 
 WMITLV_CREATE_PARAM_STRUC(WMI_BCN_TMPL_CMDID);
 
+/* FILS Discovery template Cmd */
+#define WMITLV_TABLE_WMI_FD_TMPL_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_fd_tmpl_cmd_fixed_param, wmi_fd_tmpl_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_ARRAY_BYTE, A_UINT8, bufp, WMITLV_SIZE_VAR)
+
+WMITLV_CREATE_PARAM_STRUC(WMI_FD_TMPL_CMDID);
+
 /* VDEV install key complete Cmd */
 #define WMITLV_TABLE_WMI_VDEV_INSTALL_KEY_CMDID(id,op,buf,len) \
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_vdev_install_key_cmd_fixed_param, wmi_vdev_install_key_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)\
@@ -2086,6 +2137,12 @@ WMITLV_CREATE_PARAM_STRUC(WMI_ADD_BCN_FILTER_CMDID);
     WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_WMI_STA_KEEPALVE_ARP_RESPONSE, WMI_STA_KEEPALVE_ARP_RESPONSE, arp_resp, WMITLV_SIZE_FIX)
 
 WMITLV_CREATE_PARAM_STRUC(WMI_STA_KEEPALIVE_CMDID);
+
+/* Bss Max idle time cmd */
+#define WMITLV_TABLE_WMI_VDEV_BSS_MAX_IDLE_TIME_CMDID(id,op,buf,len) \
+    WMITLV_ELEM(id,op,buf,len, WMITLV_TAG_STRUC_wmi_vdev_bss_max_idle_time_cmd_fixed_param, wmi_vdev_bss_max_idle_time_cmd_fixed_param, fixed_param, WMITLV_SIZE_FIX)
+
+WMITLV_CREATE_PARAM_STRUC(WMI_VDEV_BSS_MAX_IDLE_TIME_CMDID);
 
 /* ARP NS offload Cmd */
 #define WMITLV_TABLE_WMI_SET_ARP_NS_OFFLOAD_CMDID(id,op,buf,len) \

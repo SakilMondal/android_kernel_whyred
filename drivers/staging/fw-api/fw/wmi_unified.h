@@ -480,6 +480,10 @@ typedef enum {
     WMI_VDEV_GET_BCN_RECEPTION_STATS_CMDID,
     /* request LTE-Coex info */
     WMI_VDEV_GET_MWS_COEX_INFO_CMDID,
+    /** delete all peer (excluding bss peer) */
+    WMI_VDEV_DELETE_ALL_PEER_CMDID,
+    /* To set bss max idle time related parameters */
+    WMI_VDEV_BSS_MAX_IDLE_TIME_CMDID,
 
     /* peer specific commands */
 
@@ -612,6 +616,8 @@ typedef enum {
     WMI_BSS_COLOR_CHANGE_ENABLE_CMDID,
     /** To configure Beacon offload quiet-ie params */
     WMI_VDEV_BCN_OFFLOAD_QUIET_CONFIG_CMDID,
+    /** set FILS Discovery frame template for FW to generate FD frames */
+    WMI_FD_TMPL_CMDID,
 
     /** commands to directly control ba negotiation directly from host. only used in test mode */
 
@@ -3081,6 +3087,12 @@ typedef struct {
     #define WMI_RSRC_CFG_FLAG_PACKET_CAPTURE_SUPPORT_S 27
     #define WMI_RSRC_CFG_FLAG_PACKET_CAPTURE_SUPPORT_M 0x8000000
 
+    /*
+     * If this BIT is set, then target should support BSS Max Idle period.
+     */
+    #define WMI_RSRC_CFG_FLAG_BSS_MAX_IDLE_TIME_SUPPORT_S 28
+    #define WMI_RSRC_CFG_FLAG_BSS_MAX_IDLE_TIME_SUPPORT_M 0x10000000
+
     A_UINT32 flag1;
 
     /** @brief smart_ant_cap - Smart Antenna capabilities information
@@ -3358,6 +3370,11 @@ typedef struct {
     WMI_RSRC_CFG_FLAG_SET((word32), PACKET_CAPTURE_SUPPORT, (value))
 #define WMI_RSRC_CFG_FLAG_PACKET_CAPTURE_SUPPORT_GET(word32) \
     WMI_RSRC_CFG_FLAG_GET((word32), PACKET_CAPTURE_SUPPORT)
+
+#define WMI_RSRC_CFG_FLAG_BSS_MAX_IDLE_TIME_SUPPORT_SET(word32, value) \
+    WMI_RSRC_CFG_FLAG_SET((word32), BSS_MAX_IDLE_TIME_SUPPORT, (value))
+#define WMI_RSRC_CFG_FLAG_BSS_MAX_IDLE_TIME_SUPPORT_GET(word32) \
+    WMI_RSRC_CFG_FLAG_GET((word32), BSS_MAX_IDLE_TIME_SUPPORT)
 
 typedef struct {
     A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_init_cmd_fixed_param */
@@ -3697,10 +3714,35 @@ typedef enum {
 #define WMI_SCAN_DBS_POLICY_RESERVED            0x3
 #define WMI_SCAN_DBS_POLICY_MAX                 0x3
 
-/** Enable Reception of Public Action frame with this flag
- * (inside scan_ctrl_flags_ext field of wmi_start_scan_cmd_fixed_param)
+/* Enable Reception of Public Action frame with this flag */
+#define WMI_SCAN_FLAG_EXT_FILTER_PUBLIC_ACTION_FRAME  0x00000004
+
+/* Indicate to scan all PSC channel */
+#define WMI_SCAN_FLAG_EXT_6GHZ_SCAN_ALL_PSC_CH        0x00000008
+
+/* Indicate to scan all NON-PSC channel */
+#define WMI_SCAN_FLAG_EXT_6GHZ_SCAN_ALL_NON_PSC_CH    0x00000010
+
+/* Indicate to save scan result matching hint from scan client */
+#define WMI_SCAN_FLAG_EXT_6GHZ_MATCH_HINT             0x00000020
+
+/* Skip any ch on which no any RNR had been received */
+#define WMI_SCAN_FLAG_EXT_6GHZ_SKIP_NON_RNR_CH        0x00000040
+
+/* Indicate client hint req is high priority than fw rnr or FILS disc */
+#define WMI_SCAN_FLAG_EXT_6GHZ_CLIENT_HIGH_PRIORITY   0x00000080
+
+/* Force all 6ghz scan channels to active channel */
+#define WMI_SCAN_FLAG_EXT_6GHZ_FORCE_CHAN_ACTIVE      0x00000100
+
+/**
+ * new 6 GHz flags per chan (short ssid or bssid) in struct
+ * wmi_hint_freq_short_ssid or wmi_hint_freq_bssid
  */
 #define WMI_SCAN_FLAG_EXT_FILTER_PUBLIC_ACTION_FRAME      0x4
+
+/* Force channel in WMI hint to active channel */
+#define WMI_SCAN_HINT_FLAG_FORCE_CHAN_ACTIVE    0x00000002
 
 typedef struct {
     A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_stop_scan_cmd_fixed_param */
@@ -4195,10 +4237,25 @@ typedef struct {
      */
     A_UINT32 tx_status;
 
+    A_UINT32
+        /* tx_retry_cnt:
+         * Indicates retry count of offloaded/local & host mgmt tx frames.
+         * The WMI_MGMT_HDR_TX_RETRY_[SET,GET] macros can be used to access
+         * this bitfield in a portable manner.
+         */
+        tx_retry_cnt:6, /* [5:0] */
+        reserved_1:26;  /* [31:6] */
+
 /* This TLV may be followed by array of bytes:
  *   A_UINT8 bufp[]; <-- management frame buffer
  */
 } wmi_mgmt_hdr;
+
+/* Tx retry cnt set & get bits*/
+#define WMI_MGMT_HDR_TX_RETRY_CNT_SET(tx_retry_cnt, value) \
+    WMI_SET_BITS(tx_retry_cnt, 0, 6, value)
+#define WMI_MGMT_HDR_TX_RETRY_CNT_GET(tx_retry_cnt) \
+    WMI_GET_BITS(tx_retry_cnt, 0, 6)
 
 /*
  * Instead of universally increasing the RX_HDR_HEADROOM size which may cause problems for older targets,
@@ -5894,6 +5951,32 @@ typedef enum {
      * 31     | Enable/Disable. If set to 0, ignore bits 0-7.
      */
     WMI_PDEV_PARAM_SET_CMD_OBSS_PD_THRESHOLD,
+
+    /* Parameter used for enabling/disabling non wlan coex from boot */
+    WMI_PDEV_PARAM_ENABLE_NON_WLAN_COEX_FROM_BOOT,
+
+    /* Parameter used to configure OBSS Packet Detection per Access Category
+     * for Spatial Reuse feature.
+     * Based on the bits set, the corresponding Access Category Queues will have
+     * spatial reuse enabled / disabled.
+     * bit    | AC
+     * -----------
+     * 0      | BK
+     * 1      | BE
+     * 2      | VI
+     * 3      | VO
+     * 4 - 31 | Reserved
+     */
+    WMI_PDEV_PARAM_SET_CMD_OBSS_PD_PER_AC,
+
+    /*
+     * Parameter used to enable/disable FW control of MU-EDCA and AP back-off
+     * parameters.
+     * If set to zero, FW mode is disabled; if set to 1, FW mode is enabled.
+     * Default setting is to have it enabled, and user can disable it in
+     * favor of manual mode or host control mode.
+     */
+    WMI_PDEV_PARAM_ENABLE_FW_DYNAMIC_HE_EDCA,
 
 } WMI_PDEV_PARAM;
 
@@ -8994,6 +9077,8 @@ typedef struct {
     A_UINT32 he_ops; /* refer to WMI_HEOPS_xxx macros */
     A_UINT32 cac_duration_ms;  /* in milliseconds */
     A_UINT32 regdomain;
+    /* min data rate to be used in BSS in Mbps */
+    A_UINT32 min_data_rate;
 /* The TLVs follows this structure:
  *     wmi_channel chan; <-- WMI channel
  *     wmi_p2p_noa_descriptor  noa_descriptors[]; <-- actual p2p NOA descriptor from scan entry
@@ -9135,6 +9220,18 @@ typedef enum {
 #define WMI_VDEV_OCE_FILS_DISCOVERY_FRAME_FEATURE_BITMAP               0x10
 #define WMI_VDEV_OCE_ESP_FEATURE_BITMAP                                0x20
 #define WMI_VDEV_OCE_REASSOC_REJECT_FEATURE_BITMAP                     0x40
+
+/** 6GHZ params **/
+/* Control to enable/disable beacon tx in non-HT duplicate */
+#define WMI_VDEV_6GHZ_BITMAP_NON_HT_DUPLICATE_BEACON                    0x1
+/* Control to enable/disable broadcast probe response tx in non-HT duplicate */
+#define WMI_VDEV_6GHZ_BITMAP_NON_HT_DUPLICATE_BCAST_PROBE_RSP           0x2
+/* Control to enable/disable FILS discovery frame tx in non-HT duplicate */
+#define WMI_VDEV_6GHZ_BITMAP_NON_HT_DUPLICATE_FD_FRAME                  0x4
+/* Control to enable/disable periodic FILS discovery frame transmission */
+#define WMI_VDEV_6GHZ_BITMAP_FD_FRAME                                   0x8
+/* Control to enable/disable periodic broadcast probe response transmission */
+#define WMI_VDEV_6GHZ_BITMAP_BCAST_PROBE_RSP                            0x10
 
 /** the definition of different VDEV parameters */
 typedef enum {
@@ -9833,6 +9930,15 @@ typedef enum {
     WMI_VDEV_PARAM_PACKET_CAPTURE_MODE,         /* 0x93 */
 
 
+    /* To enable/disable multicast rate adaptation feature at vdev level */
+    WMI_VDEV_PARAM_ENABLE_MCAST_RC,            /* 0x98 */
+
+    /*
+     * Params related to 6GHz operation
+     * The parameter value is formed from WMI_VDEV_6GHZ_BITMAP flags.
+     */
+    WMI_VDEV_PARAM_6GHZ_PARAMS,                /* 0x99 */
+
     /*=== ADD NEW VDEV PARAM TYPES ABOVE THIS LINE ===
      * The below vdev param types are used for prototyping, and are
      * prone to change.
@@ -10119,6 +10225,23 @@ typedef struct {
     A_UINT32 vdev_id;
 } wmi_vdev_simple_event_fixed_param;
 
+/* Commands for getting and setting protected bit : bss max idle time */
+#define WMI_BSS_MAX_IDLE_TIME_PROTECTED_GET(idle_options) \
+    WMI_GET_BITS(idle_options, 0, 1)
+#define WMI_BSS_MAX_IDLE_TIME_PROTECTED_SET(idle_options, val) \
+    WMI_SET_BITS(idle_options, 0, 1, val)
+
+typedef struct {
+    A_UINT32 tlv_header; /* TLV tag and len; tag equals WMITLV_TAG_STRUC_WMI_VDEV_BSS_MAX_IDLE_TIME_fixed_param */
+    A_UINT32 vdev_id; /** unique id identifying the VDEV, generated by the caller */
+    A_UINT32 max_idle_period; /* time interval in seconds */
+    /* idle_options:
+     * bit 0    - Protected bit
+     *            Refer to WMI_BSS_MAX_IDLE_TIME_PROTECTED_GET,SET macros.
+     * bit 31:1 - Reserved bits
+     */
+    A_UINT32 idle_options;
+} wmi_vdev_bss_max_idle_time_cmd_fixed_param;
 
 /** VDEV start response status codes */
 #define WMI_VDEV_START_RESPONSE_STATUS_SUCCESS 0x0  /** VDEV succesfully started */
@@ -10216,6 +10339,13 @@ typedef struct {
      * is 0, 1, 4 and 5, set the bitmap to (0X80000033)
      */
     A_UINT32 csc_event_bitmap;
+    /** Specify offset for FW to overwrite MU EDCA parameters in the beacon.
+     * This is done during FW tuning of EDCA parameters.
+     * Based on number of HE and Legacy stations.
+     * If mu_edca_ie_offset == 0, it is ignored.
+     * Only non-zero values are considered.
+     */
+    A_UINT32 mu_edca_ie_offset;
 
 /*
  * The TLVs follows:
@@ -10246,6 +10376,19 @@ typedef struct {
  *    A_UINT8  data[]; <-- Variable length data
  */
 } wmi_prb_tmpl_cmd_fixed_param;
+
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_fd_tmpl_cmd_fixed_param */
+    /** unique id identifying the VDEV, generated by the caller */
+    A_UINT32 vdev_id;
+    /** fd frame buffer length. data is in TLV data[] */
+    A_UINT32 buf_len;
+
+/*
+ * The TLVs follows:
+ *    A_UINT8  data[]; <-- Variable length data
+ */
+} wmi_fd_tmpl_cmd_fixed_param;
 
 typedef struct {
     /** TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_offload_bcn_tx_status_event_fixed_param */
@@ -11570,6 +11713,9 @@ typedef struct {
      * Refer to WMI_HE_CAP_xx_LTF_xxx_SUPPORT_GET/SET macros
      */
     A_UINT32 peer_he_cap_info_internal;
+
+    /* min data rate to be used in Mbps */
+    A_UINT32 min_data_rate;
 
 /* Following this struct are the TLV's:
  *     A_UINT8 peer_legacy_rates[];
@@ -17986,7 +18132,7 @@ enum {
     do { \
         (param) &= ~PDEV_PARAM_SMART_CHAINMASK_SCHEME_DECISION_MASK; \
         (param) |= (value) << PDEV_PARAM_SMART_CHAINMASK_SCHEME_DECISION_SHIFT; \
-    while (0)
+    } while (0)
 
 #define GET_PDEV_SMART_CHAINMASK_SCHEME_DECISION(param)     \
     (((param) & PDEV_PARAM_SMART_CHAINMASK_SCHEME_DECISION_MASK) >> PDEV_PARAM_SMART_CHAINMASK_SCHEME_DECISION_SHIFT)
@@ -23462,6 +23608,8 @@ static INLINE A_UINT8 *wmi_id_to_name(A_UINT32 wmi_command)
         /* set a key (used for setting per peer unicast
          * and per vdev multicast) */
         WMI_RETURN_STRING(WMI_VDEV_INSTALL_KEY_CMDID);
+        /* Set bss max idle time */
+        WMI_RETURN_STRING(WMI_VDEV_BSS_MAX_IDLE_TIME_CMDID);
 
         /* wnm sleep mode command */
         WMI_RETURN_STRING(WMI_VDEV_WNM_SLEEPMODE_CMDID);
@@ -23523,6 +23671,8 @@ static INLINE A_UINT8 *wmi_id_to_name(A_UINT32 wmi_command)
          * to setup the common probe response template with the FW to
          * be used by FW to generate probe responses */
         WMI_RETURN_STRING(WMI_PRB_TMPL_CMDID);
+        /** set FILS Discovery frame template for FW to generate FD frames */
+        WMI_RETURN_STRING(WMI_FD_TMPL_CMDID);
 
         /* commands to directly control ba negotiation directly from
          * host. only used in test mode */
